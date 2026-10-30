@@ -181,3 +181,74 @@ model RegistroAuditoria {
   @@index([criadoEm])
   @@index([alvoTipo, alvoId])
 }
+
+// --- Prova do Better Auth (#125, etapa A1) ---
+// Tabelas separadas das de hoje (Usuario e Sessao), só para provar que o Better Auth
+// grava com nomes em português (modelName e fields em src/lib/auth/better-auth.ts).
+// O login do site não usa nada daqui; a etapa A2 decide como juntar com Usuario e Sessao.
+// O formato destas tabelas é o que o Better Auth espera (better-auth 1.7.12). O código do
+// site não grava nelas direto: tudo passa pelo auth.api (só os testes preparam dados à mão).
+// Ao atualizar o better-auth, confira nas notas da versão se o formato das tabelas mudou.
+
+model UsuarioAuth {
+  id              String   @id
+  nome            String
+  email           String   @unique
+  emailVerificado Boolean  @default(false)
+  imagem          String?
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+
+  sessoes  SessaoAuth[]
+  vinculos VinculoAuth[]
+}
+
+model SessaoAuth {
+  id           String      @id
+  // Token que vai no cookie, assinado com o BETTER_AUTH_SECRET.
+  token        String      @unique
+  usuarioId    String
+  usuario      UsuarioAuth @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  expiraEm     DateTime
+  ip           String?
+  navegador    String?
+  criadoEm     DateTime    @default(now())
+  atualizadoEm DateTime    @updatedAt
+
+  @@index([usuarioId])
+}
+
+// Cada forma de entrar de um usuário: e-mail e senha ou um provedor, como o Google.
+model VinculoAuth {
+  id                     String      @id
+  usuarioId              String
+  usuario                UsuarioAuth @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // "credential" para e-mail e senha, ou o nome do provedor ("google").
+  provedor               String
+  // ID da conta no provedor; em "credential", o próprio id do usuário.
+  idNoProvedor           String
+  // Mesmo formato de Usuario.senhaHash: scrypt$N$r$p$sal$hash (src/lib/auth/senha.ts).
+  senhaHash              String?
+  tokenAcesso            String?
+  tokenRenovacao         String?
+  tokenId                String?
+  tokenAcessoExpiraEm    DateTime?
+  tokenRenovacaoExpiraEm DateTime?
+  escopo                 String?
+  criadoEm               DateTime    @default(now())
+  atualizadoEm           DateTime    @updatedAt
+
+  @@index([usuarioId])
+}
+
+// Códigos e links de uso único (confirmação de e-mail, troca de senha).
+model VerificacaoAuth {
+  id            String   @id
+  identificador String
+  valor         String
+  expiraEm      DateTime
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@index([identificador])
+}
